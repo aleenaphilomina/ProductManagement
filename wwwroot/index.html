@@ -1,0 +1,136 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Product UI</title>
+  <style>
+    body { font-family:Segoe UI,Roboto,Arial; padding:16px; max-width:900px; }
+    input,button,textarea { font:inherit; padding:6px; margin:4px 0; width:100%; box-sizing:border-box }
+    .row { display:flex; gap:8px; }
+    .col { flex:1 }
+    pre { background:#f3f3f3; padding:8px; overflow:auto }
+    .small { font-size:0.9em; color:#555 }
+  </style>
+</head>
+<body>
+  <h2>Product Management - Minimal UI</h2>
+
+  <section>
+    <h3>Create</h3>
+    <input id="create-name" placeholder="Name" />
+    <input id="create-price" placeholder="Price" type="number" step="0.01" />
+    <input id="create-stock" placeholder="Stock" type="number" />
+    <textarea id="create-desc" placeholder="Description"></textarea>
+    <button onclick="createProduct()">Create</button>
+  </section>
+
+  <section>
+    <h3>Get / Update / Delete</h3>
+    <div class="row">
+      <div class="col">
+        <input id="id" placeholder="Product Id" />
+        <button onclick="getProduct()">Get</button>
+        <button onclick="getAll()">Get All</button>
+      </div>
+      <div class="col">
+        <input id="up-name" placeholder="Name" />
+        <input id="up-price" placeholder="Price" type="number" step="0.01" />
+        <input id="up-stock" placeholder="Stock" type="number" />
+        <textarea id="up-desc" placeholder="Description"></textarea>
+        <input id="up-rowVersion" placeholder="RowVersion (base64)" class="small" />
+        <div class="row">
+          <button onclick="updateProduct()">Update</button>
+          <button onclick="deleteProduct()">Delete</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h3>Output</h3>
+    <pre id="out">Ready</pre>
+  </section>
+
+  <script>
+    const out = id => document.getElementById('out').textContent = id;
+
+    async function createProduct() {
+      const dto = {
+        name: document.getElementById('create-name').value,
+        description: document.getElementById('create-desc').value,
+        price: parseFloat(document.getElementById('create-price').value || 0),
+        stock: parseInt(document.getElementById('create-stock').value || 0)
+      };
+      const res = await fetch('/api/products', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(dto)
+      });
+      const txt = await res.text();
+      out(`Status: ${res.status}\n\n${txt}`);
+      if (res.ok) populateUpdateFields(await res.json());
+    }
+
+    async function getProduct() {
+      const id = document.getElementById('id').value;
+      if (!id) return out('Provide id');
+      const res = await fetch(`/api/products/${id}`);
+      if (res.status === 200) {
+        const json = await res.json();
+        out(JSON.stringify(json, null, 2));
+        populateUpdateFields(json);
+      } else {
+        out(`Status: ${res.status}\n\n${await res.text()}`);
+      }
+    }
+
+    async function getAll() {
+      const res = await fetch('/api/products');
+      const json = await res.json();
+      out(JSON.stringify(json, null, 2));
+    }
+
+    function populateUpdateFields(product) {
+      if (!product) return;
+      document.getElementById('id').value = product.id;
+      document.getElementById('up-name').value = product.name || '';
+      document.getElementById('up-desc').value = product.description || '';
+      document.getElementById('up-price').value = product.price ?? 0;
+      document.getElementById('up-stock').value = product.stock ?? 0;
+      // rowVersion arrives as base64 string in JSON — keep it
+      document.getElementById('up-rowVersion').value = product.rowVersion ?? '';
+    }
+
+    async function updateProduct() {
+      const id = parseInt(document.getElementById('id').value || 0);
+      if (!id) return out('Provide id to update');
+      const dto = {
+        id,
+        name: document.getElementById('up-name').value,
+        description: document.getElementById('up-desc').value,
+        price: parseFloat(document.getElementById('up-price').value || 0),
+        stock: parseInt(document.getElementById('up-stock').value || 0),
+        rowVersion: document.getElementById('up-rowVersion').value
+      };
+      const res = await fetch(`/api/products/${id}`, {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(dto)
+      });
+      if (res.status === 204) {
+        out('Updated successfully (204). Fetching latest...');
+        await getProduct();
+      } else {
+        out(`Status: ${res.status}\n\n${await res.text()}`);
+      }
+    }
+
+    async function deleteProduct() {
+      const id = document.getElementById('id').value;
+      if (!id) return out('Provide id to delete');
+      const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+      out(`Status: ${res.status}\n\n${await res.text()}`);
+    }
+  </script>
+</body>
+</html>
